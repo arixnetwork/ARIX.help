@@ -1,7 +1,5 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'

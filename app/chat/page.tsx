@@ -1,12 +1,10 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
 import { useEffect, useRef, useState } from 'react'
 import { useChat } from '@ai-sdk/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { BookOpen, MessageSquare } from 'lucide-react'
+import { BookOpen, MessageSquare, Plus, Menu, LogOut, Settings, Send } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -18,7 +16,7 @@ export default function ChatPage() {
   const [currentConversation, setCurrentConversation] = useState<string>('')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const supabase = createClient()
+  const supabaseRef = useRef<any>(null)
 
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
     api: '/api/chat',
@@ -30,6 +28,8 @@ export default function ChatPage() {
   // Load user and conversations
   useEffect(() => {
     const loadUser = async () => {
+      const supabase = createClient()
+      supabaseRef.current = supabase
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -63,7 +63,8 @@ export default function ChatPage() {
   }, [messages])
 
   const createNewConversation = async () => {
-    const { data: conversation, error } = await supabase
+    if (!supabaseRef.current) return
+    const { data: conversation, error } = await supabaseRef.current
       .from('ai_conversations')
       .insert({
         title: 'New Conversation',
@@ -85,7 +86,9 @@ export default function ChatPage() {
   }
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    if (supabaseRef.current) {
+      await supabaseRef.current.auth.signOut()
+    }
     router.push('/auth/login')
   }
 
@@ -132,16 +135,13 @@ export default function ChatPage() {
             <button
               key={conv.id}
               onClick={() => setCurrentConversation(conv.id)}
-              className={`w-full text-left p-3 rounded-lg transition ${
+              className={`w-full text-left px-3 py-2 rounded-lg transition ${
                 currentConversation === conv.id
-                  ? 'bg-primary/20 text-primary'
-                  : 'hover:bg-card-foreground/10 text-foreground/70'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-foreground/60 hover:bg-card'
               }`}
             >
-              <p className="font-medium truncate">{conv.title}</p>
-              <p className="text-xs mt-1 opacity-60">
-                {new Date(conv.created_at).toLocaleDateString()}
-              </p>
+              <p className="truncate text-sm">{conv.title}</p>
             </button>
           ))}
         </div>
@@ -171,153 +171,68 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* Main Chat Area */}
+      {/* Main chat area */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="h-16 border-b border-border bg-card/50 flex items-center px-6">
-          <Button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            variant="ghost"
-            size="sm"
-            className="mr-4"
-          >
-            <Menu className="w-5 h-5" />
-          </Button>
-          <h1 className="text-lg font-semibold">ARIX Chat</h1>
+        <div className="bg-card border-b border-border p-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="text-foreground"
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
+            <h1 className="text-2xl font-bold text-primary">ARIX AI</h1>
+          </div>
         </div>
 
-        {/* Messages */}
+        {/* Messages area */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {messages.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-center">
-              <div>
-                <h2 className="text-2xl font-bold mb-2">Start a Conversation</h2>
-                <p className="text-foreground/60 mb-6">
-                  Ask me anything about coding, design, app development, or web building.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
-                  <button
-                    onClick={() =>
-                      handleInputChange({
-                        target: {
-                          value: 'How do I build a React component?',
-                        },
-                      } as any)
-                    }
-                    className="p-3 text-left bg-card border border-border rounded-lg hover:border-primary/50 transition"
-                  >
-                    <p className="font-medium text-sm">React Components</p>
-                    <p className="text-xs text-foreground/60 mt-1">
-                      Learn how to create React components
-                    </p>
-                  </button>
-                  <button
-                    onClick={() =>
-                      handleInputChange({
-                        target: {
-                          value: 'What are SEO best practices?',
-                        },
-                      } as any)
-                    }
-                    className="p-3 text-left bg-card border border-border rounded-lg hover:border-primary/50 transition"
-                  >
-                    <p className="font-medium text-sm">SEO Tips</p>
-                    <p className="text-xs text-foreground/60 mt-1">
-                      Get SEO optimization advice
-                    </p>
-                  </button>
-                  <button
-                    onClick={() =>
-                      handleInputChange({
-                        target: {
-                          value: 'Design principles for UI/UX',
-                        },
-                      } as any)
-                    }
-                    className="p-3 text-left bg-card border border-border rounded-lg hover:border-primary/50 transition"
-                  >
-                    <p className="font-medium text-sm">Design Principles</p>
-                    <p className="text-xs text-foreground/60 mt-1">
-                      Learn UI/UX best practices
-                    </p>
-                  </button>
-                  <button
-                    onClick={() =>
-                      handleInputChange({
-                        target: {
-                          value: 'How to deploy a web app?',
-                        },
-                      } as any)
-                    }
-                    className="p-3 text-left bg-card border border-border rounded-lg hover:border-primary/50 transition"
-                  >
-                    <p className="font-medium text-sm">Deployment</p>
-                    <p className="text-xs text-foreground/60 mt-1">
-                      Learn about web app deployment
-                    </p>
-                  </button>
-                </div>
+          {messages.map((msg, idx) => (
+            <div
+              key={idx}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-2xl px-4 py-2 rounded-lg ${
+                  msg.role === 'user'
+                    ? 'bg-primary text-primary-foreground rounded-br-none'
+                    : 'bg-card text-foreground rounded-bl-none'
+                }`}
+              >
+                {msg.content}
               </div>
             </div>
-          ) : (
-            messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-md lg:max-w-2xl p-4 rounded-lg ${
-                    msg.role === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-card border border-border text-foreground'
-                  }`}
-                >
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
-                </div>
-              </div>
-            ))
-          )}
+          ))}
           {isLoading && (
             <div className="flex justify-start">
-              <div className="bg-card border border-border text-foreground p-4 rounded-lg">
-                <div className="flex gap-2">
-                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
-                  <div
-                    className="w-2 h-2 bg-primary rounded-full animate-bounce"
-                    style={{ animationDelay: '0.2s' }}
-                  ></div>
-                  <div
-                    className="w-2 h-2 bg-primary rounded-full animate-bounce"
-                    style={{ animationDelay: '0.4s' }}
-                  ></div>
-                </div>
+              <div className="bg-card text-foreground px-4 py-2 rounded-lg">
+                Thinking...
               </div>
             </div>
           )}
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
-        <div className="border-t border-border bg-card/50 p-6">
+        {/* Input area */}
+        <div className="bg-card border-t border-border p-4">
           <form onSubmit={handleSubmit} className="flex gap-2">
             <Input
               value={input}
               onChange={handleInputChange}
-              placeholder="Ask anything about coding, design, or web development..."
-              className="flex-1 bg-input border-border text-foreground placeholder:text-foreground/50"
+              placeholder="Ask me anything..."
+              className="bg-input border-border text-foreground placeholder:text-foreground/50 flex-1"
               disabled={isLoading}
             />
             <Button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || !currentConversation}
               className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               <Send className="w-4 h-4" />
             </Button>
           </form>
-          <p className="text-xs text-foreground/50 mt-2">
-            Free tier: 10 queries/day • Pro: Unlimited
-          </p>
         </div>
       </div>
     </div>
