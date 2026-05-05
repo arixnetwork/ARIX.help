@@ -41,11 +41,11 @@ export default function ForumPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showNewPost, setShowNewPost] = useState(false)
   const [newPostForm, setNewPostForm] = useState({ title: '', category: 'general', content: '' })
-  const supabase = createClient()
 
   // Check auth
   useEffect(() => {
     const checkAuth = async () => {
+      const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         router.push('/auth/login')

@@ -38,11 +38,11 @@ export default function ResourcesPage() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [isLoading, setIsLoading] = useState(false)
-  const supabase = createClient()
 
   // Check auth
   useEffect(() => {
     const checkAuth = async () => {
+      const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         router.push('/auth/login')
