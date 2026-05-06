@@ -374,3 +374,150 @@ VALUES
   ('admin', 'Manage users, models, settings', '["users:view","users:edit","models:view","models:edit","settings:edit","pricing:manage","analytics:view","logs:view"]'::jsonb),
   ('moderator', 'View and limited user management', '["users:view","models:view","analytics:view","logs:view"]'::jsonb)
 ON CONFLICT (name) DO NOTHING;
+
+================================================================================
+-- ADVANCED CHAT FEATURES TABLES
+================================================================================
+
+-- Chat User Preferences (theme, model defaults, etc.)
+CREATE TABLE IF NOT EXISTS public.chat_preferences (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL UNIQUE REFERENCES public.users(id) ON DELETE CASCADE,
+  theme TEXT NOT NULL DEFAULT 'dark' CHECK (theme IN ('light', 'dark', 'auto')),
+  default_model TEXT,
+  temperature DECIMAL(3, 2) DEFAULT 0.7 CHECK (temperature >= 0 AND temperature <= 2),
+  max_tokens INTEGER DEFAULT 2048,
+  font_size TEXT DEFAULT 'medium' CHECK (font_size IN ('small', 'medium', 'large')),
+  message_density TEXT DEFAULT 'comfortable' CHECK (message_density IN ('compact', 'comfortable', 'spacious')),
+  show_token_count BOOLEAN DEFAULT true,
+  auto_save_drafts BOOLEAN DEFAULT true,
+  enable_notifications BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Conversation Metadata (tags, starred, pinned)
+CREATE TABLE IF NOT EXISTS public.conversation_metadata (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  conversation_id UUID NOT NULL UNIQUE REFERENCES public.ai_conversations(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  is_favorite BOOLEAN DEFAULT false,
+  is_pinned BOOLEAN DEFAULT false,
+  tags TEXT[] DEFAULT '{}',
+  description TEXT,
+  model_used TEXT,
+  temperature_used DECIMAL(3, 2),
+  total_tokens_used INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Message Reactions (emoji reactions on messages)
+CREATE TABLE IF NOT EXISTS public.message_reactions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  message_id UUID NOT NULL REFERENCES public.ai_messages(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  emoji TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(message_id, user_id, emoji)
+);
+
+-- Conversation Search Index
+CREATE TABLE IF NOT EXISTS public.conversation_search (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  conversation_id UUID NOT NULL REFERENCES public.ai_conversations(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  search_text TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Shared Conversations
+CREATE TABLE IF NOT EXISTS public.shared_conversations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  conversation_id UUID NOT NULL REFERENCES public.ai_conversations(id) ON DELETE CASCADE,
+  owner_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  share_token TEXT NOT NULL UNIQUE,
+  share_type TEXT NOT NULL DEFAULT 'link' CHECK (share_type IN ('link', 'email')),
+  expire_at TIMESTAMP WITH TIME ZONE,
+  view_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes for chat features
+CREATE INDEX IF NOT EXISTS idx_chat_preferences_user_id ON public.chat_preferences(user_id);
+CREATE INDEX IF NOT EXISTS idx_conversation_metadata_user_id ON public.conversation_metadata(user_id);
+CREATE INDEX IF NOT EXISTS idx_conversation_metadata_is_favorite ON public.conversation_metadata(is_favorite);
+CREATE INDEX IF NOT EXISTS idx_conversation_metadata_is_pinned ON public.conversation_metadata(is_pinned);
+CREATE INDEX IF NOT EXISTS idx_message_reactions_message_id ON public.message_reactions(message_id);
+CREATE INDEX IF NOT EXISTS idx_message_reactions_user_id ON public.message_reactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_conversation_search_user_id ON public.conversation_search(user_id);
+CREATE INDEX IF NOT EXISTS idx_conversation_search_text ON public.conversation_search USING GIN(to_tsvector('english', search_text));
+CREATE INDEX IF NOT EXISTS idx_shared_conversations_share_token ON public.shared_conversations(share_token);
+
+-- Enable RLS for chat feature tables
+ALTER TABLE public.chat_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.conversation_metadata ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.message_reactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.conversation_search ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.shared_conversations ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for chat_preferences
+CREATE POLICY "Users can view own preferences" ON public.chat_preferences
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own preferences" ON public.chat_preferences
+  FOR UPDATE USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own preferences" ON public.chat_preferences
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- RLS Policies for conversation_metadata
+CREATE POLICY "Users can view own metadata" ON public.conversation_metadata
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own metadata" ON public.conversation_metadata
+  FOR UPDATE USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own metadata" ON public.conversation_metadata
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- RLS Policies for message_reactions
+CREATE POLICY "Users can view reactions" ON public.message_reactions
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.ai_messages m
+      WHERE m.id = message_id AND m.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can add reactions" ON public.message_reactions
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- RLS Policies for conversation_search
+CREATE POLICY "Users can search own conversations" ON public.conversation_search
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own search" ON public.conversation_search
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- RLS Policies for shared_conversations
+CREATE POLICY "Users can view own shares" ON public.shared_conversations
+  FOR SELECT USING (auth.uid() = owner_id);
+
+CREATE POLICY "Users can insert own shares" ON public.shared_conversations
+  FOR INSERT WITH CHECK (auth.uid() = owner_id);
+
+-- Create triggers for timestamps
+DROP TRIGGER IF EXISTS trigger_update_chat_preferences ON public.chat_preferences;
+CREATE TRIGGER trigger_update_chat_preferences
+  BEFORE UPDATE ON public.chat_preferences
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_conversations_updated_at();
+
+DROP TRIGGER IF EXISTS trigger_update_conversation_metadata ON public.conversation_metadata;
+CREATE TRIGGER trigger_update_conversation_metadata
+  BEFORE UPDATE ON public.conversation_metadata
+  FOR EACH ROW
+  EXECUTE FUNCTION public.update_conversations_updated_at();
