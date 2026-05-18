@@ -1,0 +1,104 @@
+{
+  "project_name": "Arix.help",
+  "theme": "dark",
+  "archetype": "4 - Swiss & High-Contrast (Dark Mode Variant)",
+  "emotional_tone": "Precise, elite, frictionless, powerful",
+  "colors": {
+    "background": "#050505",
+    "surface": "#121212",
+    "surface_elevated": "#1E1E1E",
+    "border": "rgba(255, 255, 255, 0.12)",
+    "text_primary": "#FAFAFA",
+    "text_secondary": "#A1A1AA",
+    "accent_primary": "#F59E0B",
+    "accent_hover": "#D97706",
+    "error": "#EF4444",
+    "success": "#10B981"
+  },
+  "typography": {
+    "headings": {
+      "font_family": "Cabinet Grotesk, sans-serif",
+      "weights": ["400", "700", "900"],
+      "tracking": "tracking-tight"
+    },
+    "body": {
+      "font_family": "Chivo, sans-serif",
+      "weights": ["400", "500"]
+    },
+    "mono": {
+      "font_family": "JetBrains Mono, monospace",
+      "weights": ["400", "500"]
+    },
+    "rules": [
+      "No Inter, Roboto, or Open Sans.",
+      "Use mono font for overlines, labels, and all code blocks with tracking-[0.1em].",
+      "H1 size fluid clamp max text-6xl, strict tracking-tighter."
+    ]
+  },
+  "layout_and_spacing": {
+    "marketing": {
+      "grid": "Tetris Bento Grid (grid-cols-12, wide gaps gap-8 to gap-12)",
+      "spacing": "Generous (p-12, p-24, py-32)",
+      "alignment": "Left-aligned heavy, asymmetrical"
+    },
+    "dashboard_ide": {
+      "grid": "Control Room layout (flex/resizable panels, h-screen)",
+      "spacing": "Tight (p-2, p-4, gap-4)",
+      "alignment": "Strict grid, full utilization of screen real estate"
+    }
+  },
+  "surfaces_and_borders": {
+    "marketing_cards": "1px border-white/10, bg-white/[0.02], subtle backdrop blur, 'Tracing Beam' glow on hover.",
+    "dashboard_panels": "Flat dark bg (#121212), rigid 1px border (#3F3F46), sharp corners (rounded-sm or rounded-none). No soft shadows.",
+    "header": "Crystal glassmorphism sticky header (backdrop-blur-xl bg-black/60) with 1px bottom border border-white/10."
+  },
+  "animations": {
+    "marketing": "Lenis smooth scroll, Framer Motion for fade-up-stagger, Tracing Beam border loops.",
+    "dashboard": "Micro-interactions only. Instant feedback. No bouncy UI."
+  },
+  "media": {
+    "image_urls": [
+      {
+        "url": "https://static.prod-images.emergentagent.com/jobs/2e4fd4de-b8b6-4b24-a536-a12da483f578/images/16402d4ec0768f7a41a39baba4c561353ec24dd67c0bad843716e1ba8b6bac7f.png",
+        "category": "hero_background",
+        "description": "Abstract minimalist dark mode architectural structure with amber lines. Use in marketing hero with bg-black/50 overlay."
+      },
+      {
+        "url": "https://static.prod-images.emergentagent.com/jobs/2e4fd4de-b8b6-4b24-a536-a12da483f578/images/f57acd85b209d8d0b80bbae25695957f96d30f9d6a7924393419453c625f1fd0.png",
+        "category": "features_background",
+        "description": "Frosted glass floating over black background. Use for bento grid backgrounds or section dividers."
+      },
+      {
+        "url": "https://images.pexels.com/photos/7505924/pexels-photo-7505924.jpeg",
+        "category": "texture",
+        "description": "Rippling dark texture. Use for empty states in dashboard or pricing card backgrounds with heavy black overlay."
+      }
+    ]
+  },
+  "components_strategy": {
+    "ide_workspace": {
+      "layout": "react-resizable-panels for Left Sidebar (Explorer), Center (Editor), Right (AI Chat), Bottom (Terminal).",
+      "editor": "@monaco-editor/react for realistic VSCode feel, configured to dark theme.",
+      "ai_chat": "Markdown rendering with react-markdown and syntax highlighting. Streaming text effect.",
+      "tabs": "Shadcn Tabs customized to look like VSCode file tabs (border-b-2 border-transparent data-[state=active]:border-amber-500 rounded-none)."
+    },
+    "marketing": {
+      "buttons": "Flat bg-amber-500 text-black hover:bg-amber-400 rounded-sm font-mono uppercase tracking-widest text-xs py-3 px-6 for primary CTA. Ghost/outline for secondary.",
+      "bento_grid": "Grid layout for features. Asymmetrical spans."
+    }
+  },
+  "accessibility_and_testing": {
+    "contrast": "Ensure APCA contrast standards. Dimmed text must be readable.",
+    "testing": "All interactive elements MUST include data-testid attribute in kebab-case (e.g., data-testid='ide-run-button', data-testid='login-submit-button')."
+  },
+  "instructions_to_main_agent": [
+    "Install and use 'Cabinet Grotesk', 'Chivo', and 'JetBrains Mono'. You can import them via @fontsource or google fonts.",
+    "Implement the IDE using 'react-resizable-panels' and '@monaco-editor/react'.",
+    "Ensure the AI Chat interface looks distinct, mimicking Cursor/ChatGPT with model selector chip (Claude/GPT/Gemini).",
+    "Build the dashboard using a dense, border-collapse 'Control Room' grid styling. No heavy shadows, rely on 1px borders.",
+    "The marketing site should use Framer Motion for reveal animations and a premium, spacious 'Tetris Grid'.",
+    "Use Phosphor Icons (@phosphor-icons/react).",
+    "Never use generic Shadcn out-of-the-box appearance for the marketing site. Strip it and apply custom classes.",
+    "Add 'data-testid' to every interactive element (buttons, links, inputs, tabs)."
+  ]
+}
