@@ -79,4 +79,5 @@ agenthub/agents/youtube/db
 memory/test_credentials.md
 
 # Mobile development
-android-sdk/
+android-sdk/frontend/node_modules/.cache/default-development/0.pack
+frontend/node_modules/.cache/default-development/5.pack
