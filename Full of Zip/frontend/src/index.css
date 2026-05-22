@@ -1,0 +1,224 @@
+@import url('https://fonts.googleapis.com/css2?family=Chivo:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@400,700,900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        --background: 0 0% 2%;
+        --foreground: 0 0% 98%;
+        --card: 0 0% 7%;
+        --card-foreground: 0 0% 98%;
+        --popover: 0 0% 7%;
+        --popover-foreground: 0 0% 98%;
+        --primary: 38 92% 50%;
+        --primary-foreground: 0 0% 5%;
+        --secondary: 0 0% 12%;
+        --secondary-foreground: 0 0% 98%;
+        --muted: 0 0% 12%;
+        --muted-foreground: 0 0% 63%;
+        --accent: 0 0% 12%;
+        --accent-foreground: 0 0% 98%;
+        --destructive: 0 84% 60%;
+        --destructive-foreground: 0 0% 98%;
+        --border: 0 0% 14%;
+        --input: 0 0% 14%;
+        --ring: 38 92% 50%;
+        --radius: 0.125rem;
+    }
+}
+
+* {
+    border-color: hsl(var(--border));
+}
+
+html,
+body,
+#root {
+    background: #050505;
+    color: #fafafa;
+    font-family: 'Chivo', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    margin: 0;
+}
+
+.font-display {
+    font-family: 'Cabinet Grotesk', 'Chivo', sans-serif;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+}
+
+.font-body {
+    font-family: 'Chivo', sans-serif;
+}
+
+.font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.tracking-mono {
+    letter-spacing: 0.1em;
+}
+
+/* Scrollbars (dark, slim) */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: #2a2a2a;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #3a3a3a;
+}
+
+/* Selection */
+::selection {
+    background: #f59e0b;
+    color: #050505;
+}
+
+/* Grid texture for hero */
+.bg-grid {
+    background-image:
+        linear-gradient(
+            to right,
+            rgba(255, 255, 255, 0.04) 1px,
+            transparent 1px
+        ),
+        linear-gradient(
+            to bottom,
+            rgba(255, 255, 255, 0.04) 1px,
+            transparent 1px
+        );
+    background-size: 56px 56px;
+}
+
+.bg-grid-fade {
+    mask-image: radial-gradient(
+        ellipse at center,
+        black 30%,
+        transparent 75%
+    );
+    -webkit-mask-image: radial-gradient(
+        ellipse at center,
+        black 30%,
+        transparent 75%
+    );
+}
+
+.glass {
+    background: rgba(18, 18, 18, 0.6);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+.tracing-border {
+    position: relative;
+}
+.tracing-border::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+        135deg,
+        rgba(245, 158, 11, 0) 0%,
+        rgba(245, 158, 11, 0.4) 50%,
+        rgba(245, 158, 11, 0) 100%
+    );
+    -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+}
+.tracing-border:hover::before {
+    opacity: 1;
+}
+
+/* Markdown styles for chat */
+.markdown-body p {
+    margin: 0.5rem 0;
+    line-height: 1.65;
+}
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+    font-family: 'Cabinet Grotesk', sans-serif;
+    font-weight: 700;
+    margin: 1rem 0 0.5rem;
+}
+.markdown-body h1 {
+    font-size: 1.5rem;
+}
+.markdown-body h2 {
+    font-size: 1.25rem;
+}
+.markdown-body h3 {
+    font-size: 1.05rem;
+}
+.markdown-body ul,
+.markdown-body ol {
+    padding-left: 1.25rem;
+    margin: 0.5rem 0;
+}
+.markdown-body li {
+    margin: 0.25rem 0;
+}
+.markdown-body code {
+    background: #1e1e1e;
+    padding: 0.1rem 0.35rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+    font-size: 0.85em;
+    font-family: 'JetBrains Mono', monospace;
+}
+.markdown-body pre {
+    margin: 0.75rem 0;
+    background: #0a0a0a !important;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.markdown-body pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+.markdown-body a {
+    color: #f59e0b;
+    text-decoration: underline;
+}
+.markdown-body blockquote {
+    border-left: 2px solid #f59e0b;
+    padding-left: 0.75rem;
+    margin: 0.5rem 0;
+    color: #a1a1aa;
+}
+
+/* Subtle entrance */
+@keyframes fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.fade-up {
+    animation: fade-up 0.7s ease forwards;
+}
