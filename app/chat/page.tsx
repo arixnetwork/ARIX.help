@@ -8,80 +8,189 @@ import { BookOpen, MessageSquare, Plus, Menu, LogOut, Settings, Send } from 'luc
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import { useToast } from '@/components/ui/use-toast'
+import { Toaster } from '@/components/ui/toaster'
+
+interface Message {
+  id?: string
+  role: 'user' | 'assistant'
+  content: string
+  created_at?: string
+  tokens_used?: number
+}
+
+interface Conversation {
+  id: string
+  title: string
+  category: string
+  created_at: string
+  user_id: string
+}
 
 export default function ChatPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [user, setUser] = useState<any>(null)
-  const [conversations, setConversations] = useState<any[]>([])
+  const [conversations, setConversations] = useState<Conversation[]>([])
   const [currentConversation, setCurrentConversation] = useState<string>('')
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [historyMessages, setHistoryMessages] = useState<Message[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
+  const [error, setError] = useState<string>('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const supabaseRef = useRef<any>(null)
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
+  const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages } = useChat({
     api: '/api/chat',
     body: {
       conversationId: currentConversation,
+    },
+    onError: (error) => {
+      console.error('[v0] Chat error:', error)
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to send message',
+        variant: 'destructive',
+      })
     },
   })
 
   // Load user and conversations
   useEffect(() => {
     const loadUser = async () => {
-      const supabase = createClient()
-      supabaseRef.current = supabase
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/auth/login')
-        return
-      }
-      setUser(user)
-
-      // Load conversations
-      const { data: convs } = await supabase
-        .from('ai_conversations')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-
-      if (convs) {
-        setConversations(convs)
-        if (convs.length > 0 && !currentConversation) {
-          setCurrentConversation(convs[0].id)
+      try {
+        const supabase = createClient()
+        supabaseRef.current = supabase
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) {
+          router.push('/auth/login')
+          return
         }
+        setUser(user)
+
+        // Load conversations
+        const { data: convs, error: convsError } = await supabase
+          .from('ai_conversations')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+
+        if (convsError) {
+          console.error('[v0] Error loading conversations:', convsError)
+          setError('Failed to load conversations')
+          return
+        }
+
+        if (convs) {
+          setConversations(convs)
+          if (convs.length > 0 && !currentConversation) {
+            setCurrentConversation(convs[0].id)
+          }
+        }
+      } catch (err) {
+        console.error('[v0] Error in loadUser:', err)
+        setError('Failed to load user data')
       }
     }
 
     loadUser()
   }, [])
 
+  // Load message history when conversation changes
+  useEffect(() => {
+    const loadMessageHistory = async () => {
+      if (!currentConversation) {
+        setHistoryMessages([])
+        setMessages([])
+        return
+      }
+
+      try {
+        setLoadingHistory(true)
+        setError('')
+
+        const response = await fetch(`/api/messages?conversationId=${currentConversation}`)
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            router.push('/auth/login')
+            return
+          }
+          throw new Error(`Failed to load messages: ${response.statusText}`)
+        }
+
+        const messages = await response.json()
+        setHistoryMessages(messages || [])
+
+        // Convert to AI SDK format
+        const aiSdkMessages = (messages || []).map((msg: Message) => ({
+          id: msg.id,
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+        }))
+
+        setMessages(aiSdkMessages)
+      } catch (err) {
+        console.error('[v0] Error loading message history:', err)
+        const errorMsg = err instanceof Error ? err.message : 'Failed to load messages'
+        setError(errorMsg)
+        toast({
+          title: 'Error',
+          description: errorMsg,
+          variant: 'destructive',
+        })
+      } finally {
+        setLoadingHistory(false)
+      }
+    }
+
+    loadMessageHistory()
+  }, [currentConversation, setMessages, toast, router])
+
   // Auto scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, loadingHistory])
 
   const createNewConversation = async () => {
     if (!supabaseRef.current) return
-    const { data: conversation, error } = await supabaseRef.current
-      .from('ai_conversations')
-      .insert({
-        title: 'New Conversation',
-        category: 'general',
-        user_id: user?.id,
+    
+    try {
+      const { data: conversation, error } = await supabaseRef.current
+        .from('ai_conversations')
+        .insert({
+          title: 'New Conversation',
+          category: 'general',
+          user_id: user?.id,
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('[v0] Error creating conversation:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to create conversation',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      if (conversation) {
+        setConversations([conversation, ...conversations])
+        setCurrentConversation(conversation.id)
+        setHistoryMessages([])
+        setMessages([])
+      }
+    } catch (err) {
+      console.error('[v0] Error in createNewConversation:', err)
+      toast({
+        title: 'Error',
+        description: 'Failed to create conversation',
+        variant: 'destructive',
       })
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Error creating conversation:', error)
-      return
-    }
-
-    if (conversation) {
-      setConversations([conversation, ...conversations])
-      setCurrentConversation(conversation.id)
     }
   }
 
@@ -189,28 +298,56 @@ export default function ChatPage() {
 
         {/* Messages area */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {messages.map((msg, idx) => (
-            <div
-              key={idx}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-2xl px-4 py-2 rounded-lg ${
-                  msg.role === 'user'
-                    ? 'bg-primary text-primary-foreground rounded-br-none'
-                    : 'bg-card text-foreground rounded-bl-none'
-                }`}
-              >
-                {msg.content}
+          {error && (
+            <div className="flex justify-center mb-4">
+              <div className="max-w-2xl px-4 py-3 rounded-lg bg-destructive/20 text-destructive border border-destructive/50 text-sm">
+                Error: {error}
               </div>
             </div>
-          ))}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-card text-foreground px-4 py-2 rounded-lg">
-                Thinking...
+          )}
+
+          {loadingHistory ? (
+            <div className="flex justify-center items-center h-full">
+              <div className="text-center space-y-2">
+                <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
+                <p className="text-foreground/60 text-sm">Loading messages...</p>
               </div>
             </div>
+          ) : messages.length === 0 ? (
+            <div className="flex justify-center items-center h-full">
+              <div className="text-center space-y-2">
+                <MessageSquare className="w-12 h-12 text-foreground/30 mx-auto" />
+                <p className="text-foreground/60">No messages yet. Start a conversation!</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {messages.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-2xl px-4 py-2 rounded-lg ${
+                      msg.role === 'user'
+                        ? 'bg-primary text-primary-foreground rounded-br-none'
+                        : 'bg-card text-foreground rounded-bl-none'
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-card text-foreground px-4 py-2 rounded-lg rounded-bl-none flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-foreground/30 border-t-foreground rounded-full animate-spin" />
+                    Thinking...
+                  </div>
+                </div>
+              )}
+            </>
           )}
           <div ref={messagesEndRef} />
         </div>
@@ -223,18 +360,24 @@ export default function ChatPage() {
               onChange={handleInputChange}
               placeholder="Ask me anything..."
               className="bg-input border-border text-foreground placeholder:text-foreground/50 flex-1"
-              disabled={isLoading}
+              disabled={isLoading || !currentConversation}
             />
             <Button
               type="submit"
-              disabled={isLoading || !currentConversation}
+              disabled={isLoading || !currentConversation || !input.trim()}
               className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
-              <Send className="w-4 h-4" />
+              {isLoading ? (
+                <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
             </Button>
           </form>
         </div>
       </div>
+
+      <Toaster />
     </div>
   )
 }
