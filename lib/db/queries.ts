@@ -455,3 +455,268 @@ export async function getConversationPrompt(conversationId: string) {
     return null
   }
 }
+
+// STRIPE PAYMENT QUERIES
+
+export async function getOrCreateStripeCustomer(userId: string, email: string) {
+  try {
+    const supabase = await createClient()
+    
+    // Check if customer exists
+    const { data: existingCustomer, error: selectError } = await supabase
+      .from('stripe_customers')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+    
+    if (selectError && selectError.code !== 'PGRST116') {
+      console.error('[v0] Error fetching customer:', selectError)
+      return null
+    }
+    
+    if (existingCustomer) {
+      return existingCustomer
+    }
+    
+    // Create new customer record
+    const { data: newCustomer, error: insertError } = await supabase
+      .from('stripe_customers')
+      .insert({
+        user_id: userId,
+        stripe_customer_id: '', // Will be updated when Stripe customer is created
+        email: email,
+      })
+      .select()
+      .single()
+    
+    if (insertError) {
+      console.error('[v0] Failed to create customer record:', insertError)
+      return null
+    }
+    
+    return newCustomer
+  } catch (error) {
+    console.error('[v0] Error in getOrCreateStripeCustomer:', error)
+    return null
+  }
+}
+
+export async function updateStripeCustomerId(userId: string, stripeCustomerId: string) {
+  try {
+    const supabase = await createClient()
+    
+    const { data, error } = await supabase
+      .from('stripe_customers')
+      .update({ stripe_customer_id: stripeCustomerId })
+      .eq('user_id', userId)
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('[v0] Failed to update stripe customer id:', error)
+      return null
+    }
+    
+    return data
+  } catch (error) {
+    console.error('[v0] Error updating stripe customer id:', error)
+    return null
+  }
+}
+
+export async function getStripeCustomerByUserId(userId: string) {
+  try {
+    const supabase = await createClient()
+    
+    const { data, error } = await supabase
+      .from('stripe_customers')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+    
+    if (error) {
+      console.error('[v0] Failed to fetch stripe customer:', error)
+      return null
+    }
+    
+    return data
+  } catch (error) {
+    console.error('[v0] Error fetching stripe customer:', error)
+    return null
+  }
+}
+
+export async function createStripeSubscription(
+  userId: string,
+  stripeSubscriptionId: string,
+  stripeCustomerId: string,
+  stripePriceId: string,
+  planName: string,
+  planAmount: number,
+  planInterval: string,
+  monthlyCredits: number
+) {
+  try {
+    const supabase = await createClient()
+    
+    const { data, error } = await supabase
+      .from('stripe_subscriptions')
+      .insert({
+        user_id: userId,
+        stripe_subscription_id: stripeSubscriptionId,
+        stripe_customer_id: stripeCustomerId,
+        stripe_price_id: stripePriceId,
+        status: 'active',
+        plan_name: planName,
+        plan_amount: planAmount,
+        plan_interval: planInterval,
+        monthly_credits: monthlyCredits,
+      })
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('[v0] Failed to create subscription:', error)
+      return null
+    }
+    
+    return data
+  } catch (error) {
+    console.error('[v0] Error creating subscription:', error)
+    return null
+  }
+}
+
+export async function getActiveSubscription(userId: string) {
+  try {
+    const supabase = await createClient()
+    
+    const { data, error } = await supabase
+      .from('stripe_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .single()
+    
+    if (error && error.code !== 'PGRST116') {
+      console.error('[v0] Failed to fetch subscription:', error)
+      return null
+    }
+    
+    return data || null
+  } catch (error) {
+    console.error('[v0] Error fetching subscription:', error)
+    return null
+  }
+}
+
+export async function updateSubscriptionStatus(
+  stripeSubscriptionId: string,
+  status: string,
+  currentPeriodEnd?: Date
+) {
+  try {
+    const supabase = await createClient()
+    
+    const updateData: any = { status }
+    if (currentPeriodEnd) {
+      updateData.current_period_end = currentPeriodEnd.toISOString()
+    }
+    
+    const { data, error } = await supabase
+      .from('stripe_subscriptions')
+      .update(updateData)
+      .eq('stripe_subscription_id', stripeSubscriptionId)
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('[v0] Failed to update subscription status:', error)
+      return null
+    }
+    
+    return data
+  } catch (error) {
+    console.error('[v0] Error updating subscription status:', error)
+    return null
+  }
+}
+
+export async function getUserSubscriptions(userId: string) {
+  try {
+    const supabase = await createClient()
+    
+    const { data, error } = await supabase
+      .from('stripe_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+    
+    if (error) {
+      console.error('[v0] Failed to fetch subscriptions:', error)
+      return []
+    }
+    
+    return data || []
+  } catch (error) {
+    console.error('[v0] Error fetching subscriptions:', error)
+    return []
+  }
+}
+
+export async function createStripeInvoice(
+  userId: string,
+  stripeInvoiceId: string,
+  amount: number,
+  status: string,
+  stripeSubscriptionId?: string
+) {
+  try {
+    const supabase = await createClient()
+    
+    const { data, error } = await supabase
+      .from('stripe_invoices')
+      .insert({
+        user_id: userId,
+        stripe_invoice_id: stripeInvoiceId,
+        stripe_subscription_id: stripeSubscriptionId,
+        amount,
+        status,
+      })
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('[v0] Failed to create invoice:', error)
+      return null
+    }
+    
+    return data
+  } catch (error) {
+    console.error('[v0] Error creating invoice:', error)
+    return null
+  }
+}
+
+export async function getUserInvoices(userId: string, limit = 50, offset = 0) {
+  try {
+    const supabase = await createClient()
+    
+    const { data, error, count } = await supabase
+      .from('stripe_invoices')
+      .select('*', { count: 'exact' })
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1)
+    
+    if (error) {
+      console.error('[v0] Failed to fetch invoices:', error)
+      return { invoices: [], total: 0 }
+    }
+    
+    return { invoices: data || [], total: count || 0 }
+  } catch (error) {
+    console.error('[v0] Error fetching invoices:', error)
+    return { invoices: [], total: 0 }
+  }
+}

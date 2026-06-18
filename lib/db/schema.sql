@@ -613,6 +613,87 @@ CREATE POLICY "Users can insert conversation prompts" ON public.conversation_pro
   );
 
 -- Insert 18 AI Prompts
+================================================================================
+-- STRIPE PAYMENT INTEGRATION
+================================================================================
+
+-- Stripe Customers table
+CREATE TABLE IF NOT EXISTS public.stripe_customers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL UNIQUE REFERENCES public.users(id) ON DELETE CASCADE,
+  stripe_customer_id TEXT NOT NULL UNIQUE,
+  email TEXT NOT NULL,
+  name TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Stripe Subscriptions table
+CREATE TABLE IF NOT EXISTS public.stripe_subscriptions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  stripe_subscription_id TEXT NOT NULL UNIQUE,
+  stripe_customer_id TEXT NOT NULL,
+  stripe_price_id TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('trialing', 'active', 'past_due', 'canceled', 'unpaid')),
+  plan_name TEXT NOT NULL DEFAULT 'pro',
+  plan_amount INTEGER NOT NULL,
+  plan_currency TEXT NOT NULL DEFAULT 'usd',
+  plan_interval TEXT NOT NULL DEFAULT 'month' CHECK (plan_interval IN ('month', 'year')),
+  monthly_credits INTEGER NOT NULL DEFAULT 500,
+  current_period_start TIMESTAMP WITH TIME ZONE,
+  current_period_end TIMESTAMP WITH TIME ZONE,
+  cancel_at TIMESTAMP WITH TIME ZONE,
+  canceled_at TIMESTAMP WITH TIME ZONE,
+  trial_start TIMESTAMP WITH TIME ZONE,
+  trial_end TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Stripe Invoices table
+CREATE TABLE IF NOT EXISTS public.stripe_invoices (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  stripe_invoice_id TEXT NOT NULL UNIQUE,
+  stripe_subscription_id TEXT,
+  amount INTEGER NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'usd',
+  status TEXT NOT NULL CHECK (status IN ('draft', 'open', 'paid', 'uncollectible', 'void')),
+  invoice_pdf_url TEXT,
+  paid_at TIMESTAMP WITH TIME ZONE,
+  due_date TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes for Stripe tables
+CREATE INDEX IF NOT EXISTS idx_stripe_customers_user_id ON public.stripe_customers(user_id);
+CREATE INDEX IF NOT EXISTS idx_stripe_customers_stripe_id ON public.stripe_customers(stripe_customer_id);
+CREATE INDEX IF NOT EXISTS idx_stripe_subscriptions_user_id ON public.stripe_subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_stripe_subscriptions_stripe_id ON public.stripe_subscriptions(stripe_subscription_id);
+CREATE INDEX IF NOT EXISTS idx_stripe_subscriptions_status ON public.stripe_subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_stripe_invoices_user_id ON public.stripe_invoices(user_id);
+CREATE INDEX IF NOT EXISTS idx_stripe_invoices_stripe_id ON public.stripe_invoices(stripe_invoice_id);
+CREATE INDEX IF NOT EXISTS idx_stripe_invoices_status ON public.stripe_invoices(status);
+
+-- Enable RLS for Stripe tables
+ALTER TABLE public.stripe_customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stripe_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stripe_invoices ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for stripe_customers
+CREATE POLICY "Users can view own customer record" ON public.stripe_customers
+  FOR SELECT USING (auth.uid() = user_id);
+
+-- RLS Policies for stripe_subscriptions
+CREATE POLICY "Users can view own subscriptions" ON public.stripe_subscriptions
+  FOR SELECT USING (auth.uid() = user_id);
+
+-- RLS Policies for stripe_invoices
+CREATE POLICY "Users can view own invoices" ON public.stripe_invoices
+  FOR SELECT USING (auth.uid() = user_id);
+
 INSERT INTO public.ai_prompts (name, description, category, system_prompt, emoji, color, is_active)
 VALUES
   (
