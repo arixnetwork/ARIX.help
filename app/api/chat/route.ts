@@ -2,9 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { groq } from '@ai-sdk/groq'
 import { streamText } from 'ai'
 import { NextRequest, NextResponse } from 'next/server'
-import { calculateTokens, saveMessage, trackUsage, deductCredits, updateConversationTitle } from '@/lib/db/queries'
+import { calculateTokens, saveMessage, trackUsage, deductCredits, updateConversationTitle, getPromptById, linkPromptToConversation } from '@/lib/db/queries'
 
 const MODEL = 'mixtral-8x7b-32768'
+const DEFAULT_SYSTEM_PROMPT = `You are ARIX.help, a helpful AI assistant specialized in coding, design, app development, SaaS, SEO, and web development. You provide practical, actionable advice and code examples when relevant. Be concise, clear, and always provide the most valuable information first.`
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { messages, conversationId } = body
+    const { messages, conversationId, promptId } = body
 
     if (!messages || messages.length === 0) {
       return NextResponse.json({ error: 'No messages provided' }, { status: 400 })
@@ -80,6 +81,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Get the system prompt based on promptId
+    let systemPrompt = DEFAULT_SYSTEM_PROMPT
+    
+    if (promptId) {
+      try {
+        const prompt = await getPromptById(promptId)
+        if (prompt) {
+          systemPrompt = prompt.system_prompt
+          
+          // Link prompt to conversation on first use
+          if (conversationId) {
+            await linkPromptToConversation(conversationId, promptId)
+          }
+        }
+      } catch (error) {
+        console.error('[v0] Failed to get prompt:', error)
+        // Continue with default prompt
+      }
+    }
+
     // Collect AI response before streaming
     let aiResponseContent = ''
 
@@ -90,7 +111,7 @@ export async function POST(request: NextRequest) {
         role: msg.role,
         content: msg.content,
       })),
-      system: `You are ARIX.help, a helpful AI assistant specialized in coding, design, app development, SaaS, SEO, and web development. You provide practical, actionable advice and code examples when relevant. Be concise, clear, and always provide the most valuable information first.`,
+      system: systemPrompt,
       onFinish: async (completion) => {
         // This runs after streaming completes
         const aiResponseTokens = calculateTokens(completion.text)

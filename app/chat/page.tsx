@@ -10,6 +10,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/ui/use-toast'
 import { Toaster } from '@/components/ui/toaster'
+import { PromptSelector } from '@/components/PromptSelector'
 
 interface Message {
   id?: string
@@ -27,6 +28,17 @@ interface Conversation {
   user_id: string
 }
 
+interface AIPrompt {
+  id: string
+  name: string
+  description: string
+  category: string
+  emoji: string
+  color: string
+  is_active: boolean
+  system_prompt: string
+}
+
 export default function ChatPage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -37,6 +49,7 @@ export default function ChatPage() {
   const [historyMessages, setHistoryMessages] = useState<Message[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [error, setError] = useState<string>('')
+  const [selectedPrompt, setSelectedPrompt] = useState<AIPrompt | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const supabaseRef = useRef<any>(null)
 
@@ -44,6 +57,7 @@ export default function ChatPage() {
     api: '/api/chat',
     body: {
       conversationId: currentConversation,
+      promptId: selectedPrompt?.id,
     },
     onError: (error) => {
       console.error('[v0] Chat error:', error)
@@ -283,17 +297,28 @@ export default function ChatPage() {
       {/* Main chat area */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="bg-card border-b border-border p-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="text-foreground"
-            >
-              <Menu className="w-5 h-5" />
-            </Button>
-            <h1 className="text-2xl font-bold text-primary">ARIX AI</h1>
+        <div className="bg-card border-b border-border p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="text-foreground"
+              >
+                <Menu className="w-5 h-5" />
+              </Button>
+              <h1 className="text-2xl font-bold text-primary">ARIX AI</h1>
+            </div>
           </div>
+          {currentConversation && (
+            <div className="max-w-xs">
+              <PromptSelector
+                onPromptSelect={setSelectedPrompt}
+                selectedPrompt={selectedPrompt}
+                isLoading={isLoading}
+              />
+            </div>
+          )}
         </div>
 
         {/* Messages area */}
