@@ -521,3 +521,341 @@ CREATE TRIGGER trigger_update_conversation_metadata
   BEFORE UPDATE ON public.conversation_metadata
   FOR EACH ROW
   EXECUTE FUNCTION public.update_conversations_updated_at();
+
+================================================================================
+-- AI PROMPTS SYSTEM (18 Specialized Personas)
+================================================================================
+
+-- AI Prompts table
+CREATE TABLE IF NOT EXISTS public.ai_prompts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL UNIQUE,
+  description TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('development', 'design', 'business', 'marketing', 'general')),
+  system_prompt TEXT NOT NULL,
+  emoji TEXT,
+  color TEXT,
+  is_active BOOLEAN DEFAULT true,
+  usage_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- User Prompt Preferences (favorites and recently used)
+CREATE TABLE IF NOT EXISTS public.user_prompt_preferences (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  prompt_id UUID NOT NULL REFERENCES public.ai_prompts(id) ON DELETE CASCADE,
+  is_favorite BOOLEAN DEFAULT false,
+  last_used TIMESTAMP WITH TIME ZONE,
+  usage_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, prompt_id)
+);
+
+-- Conversation Prompts (tracks which prompt was used in each conversation)
+CREATE TABLE IF NOT EXISTS public.conversation_prompts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  conversation_id UUID NOT NULL UNIQUE REFERENCES public.ai_conversations(id) ON DELETE CASCADE,
+  prompt_id UUID NOT NULL REFERENCES public.ai_prompts(id) ON DELETE SET NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes for AI prompts
+CREATE INDEX IF NOT EXISTS idx_ai_prompts_name ON public.ai_prompts(name);
+CREATE INDEX IF NOT EXISTS idx_ai_prompts_category ON public.ai_prompts(category);
+CREATE INDEX IF NOT EXISTS idx_ai_prompts_is_active ON public.ai_prompts(is_active);
+CREATE INDEX IF NOT EXISTS idx_user_prompt_preferences_user_id ON public.user_prompt_preferences(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_prompt_preferences_is_favorite ON public.user_prompt_preferences(is_favorite);
+CREATE INDEX IF NOT EXISTS idx_user_prompt_preferences_last_used ON public.user_prompt_preferences(last_used DESC);
+CREATE INDEX IF NOT EXISTS idx_conversation_prompts_conversation_id ON public.conversation_prompts(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_conversation_prompts_prompt_id ON public.conversation_prompts(prompt_id);
+
+-- Enable RLS for AI prompts tables
+ALTER TABLE public.ai_prompts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_prompt_preferences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.conversation_prompts ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for ai_prompts (readable by all authenticated users)
+CREATE POLICY "AI prompts readable by all" ON public.ai_prompts
+  FOR SELECT USING (is_active = true);
+
+-- RLS Policies for user_prompt_preferences
+CREATE POLICY "Users can view own preferences" ON public.user_prompt_preferences
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own preferences" ON public.user_prompt_preferences
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own preferences" ON public.user_prompt_preferences
+  FOR UPDATE USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own preferences" ON public.user_prompt_preferences
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- RLS Policies for conversation_prompts
+CREATE POLICY "Users can view own conversation prompts" ON public.conversation_prompts
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.ai_conversations
+      WHERE id = conversation_id AND user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can insert conversation prompts" ON public.conversation_prompts
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.ai_conversations
+      WHERE id = conversation_id AND user_id = auth.uid()
+    )
+  );
+
+-- Insert 18 AI Prompts
+================================================================================
+-- STRIPE PAYMENT INTEGRATION
+================================================================================
+
+-- Stripe Customers table
+CREATE TABLE IF NOT EXISTS public.stripe_customers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL UNIQUE REFERENCES public.users(id) ON DELETE CASCADE,
+  stripe_customer_id TEXT NOT NULL UNIQUE,
+  email TEXT NOT NULL,
+  name TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Stripe Subscriptions table
+CREATE TABLE IF NOT EXISTS public.stripe_subscriptions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  stripe_subscription_id TEXT NOT NULL UNIQUE,
+  stripe_customer_id TEXT NOT NULL,
+  stripe_price_id TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('trialing', 'active', 'past_due', 'canceled', 'unpaid')),
+  plan_name TEXT NOT NULL DEFAULT 'pro',
+  plan_amount INTEGER NOT NULL,
+  plan_currency TEXT NOT NULL DEFAULT 'usd',
+  plan_interval TEXT NOT NULL DEFAULT 'month' CHECK (plan_interval IN ('month', 'year')),
+  monthly_credits INTEGER NOT NULL DEFAULT 500,
+  current_period_start TIMESTAMP WITH TIME ZONE,
+  current_period_end TIMESTAMP WITH TIME ZONE,
+  cancel_at TIMESTAMP WITH TIME ZONE,
+  canceled_at TIMESTAMP WITH TIME ZONE,
+  trial_start TIMESTAMP WITH TIME ZONE,
+  trial_end TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Stripe Invoices table
+CREATE TABLE IF NOT EXISTS public.stripe_invoices (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  stripe_invoice_id TEXT NOT NULL UNIQUE,
+  stripe_subscription_id TEXT,
+  amount INTEGER NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'usd',
+  status TEXT NOT NULL CHECK (status IN ('draft', 'open', 'paid', 'uncollectible', 'void')),
+  invoice_pdf_url TEXT,
+  paid_at TIMESTAMP WITH TIME ZONE,
+  due_date TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes for Stripe tables
+CREATE INDEX IF NOT EXISTS idx_stripe_customers_user_id ON public.stripe_customers(user_id);
+CREATE INDEX IF NOT EXISTS idx_stripe_customers_stripe_id ON public.stripe_customers(stripe_customer_id);
+CREATE INDEX IF NOT EXISTS idx_stripe_subscriptions_user_id ON public.stripe_subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_stripe_subscriptions_stripe_id ON public.stripe_subscriptions(stripe_subscription_id);
+CREATE INDEX IF NOT EXISTS idx_stripe_subscriptions_status ON public.stripe_subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_stripe_invoices_user_id ON public.stripe_invoices(user_id);
+CREATE INDEX IF NOT EXISTS idx_stripe_invoices_stripe_id ON public.stripe_invoices(stripe_invoice_id);
+CREATE INDEX IF NOT EXISTS idx_stripe_invoices_status ON public.stripe_invoices(status);
+
+-- Enable RLS for Stripe tables
+ALTER TABLE public.stripe_customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stripe_subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stripe_invoices ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for stripe_customers
+CREATE POLICY "Users can view own customer record" ON public.stripe_customers
+  FOR SELECT USING (auth.uid() = user_id);
+
+-- RLS Policies for stripe_subscriptions
+CREATE POLICY "Users can view own subscriptions" ON public.stripe_subscriptions
+  FOR SELECT USING (auth.uid() = user_id);
+
+-- RLS Policies for stripe_invoices
+CREATE POLICY "Users can view own invoices" ON public.stripe_invoices
+  FOR SELECT USING (auth.uid() = user_id);
+
+INSERT INTO public.ai_prompts (name, description, category, system_prompt, emoji, color, is_active)
+VALUES
+  (
+    'Master Orchestrator',
+    'Coordinates complex workflows, breaks down intricate problems, and manages multi-step projects seamlessly.',
+    'general',
+    'You are a Master Orchestrator AI. Your role is to coordinate complex workflows, break down intricate problems into manageable steps, and manage multi-step projects with precision. You excel at seeing the big picture while maintaining attention to detail. Provide clear guidance that integrates all aspects of a project.',
+    '🎼',
+    '#8B5CF6',
+    true
+  ),
+  (
+    'Software Engineer',
+    'Expert in coding, debugging, architecture design, and software development best practices.',
+    'development',
+    'You are an expert Software Engineer AI. You provide clean, efficient code in multiple languages, debug complex issues, design scalable architectures, and follow industry best practices. Focus on code quality, performance, and maintainability.',
+    '💻',
+    '#3B82F6',
+    true
+  ),
+  (
+    'SaaS Architect',
+    'Specializes in designing scalable SaaS platforms with modern tech stacks and best practices.',
+    'development',
+    'You are a SaaS Architect AI. You design scalable SaaS platforms using modern technology stacks. You understand databases, APIs, authentication, payment systems, and deployment strategies. Provide architectural guidance that supports growth and reliability.',
+    '🏗️',
+    '#06B6D4',
+    true
+  ),
+  (
+    'Web Builder',
+    'Creates responsive websites with modern UI/UX, CSS, JavaScript, and full-stack capabilities.',
+    'design',
+    'You are a Web Builder AI. You specialize in creating responsive, modern websites with excellent UI/UX. You understand HTML, CSS, JavaScript, frameworks like React and Vue, and can build complete web applications from concept to deployment.',
+    '🌐',
+    '#10B981',
+    true
+  ),
+  (
+    'UI/UX Designer',
+    'Designs beautiful, user-friendly interfaces with strong design principles and accessibility focus.',
+    'design',
+    'You are a UI/UX Designer AI. You create beautiful, intuitive interfaces that delight users. You understand design principles, color theory, typography, accessibility, and user psychology. Provide design recommendations that improve usability and aesthetics.',
+    '🎨',
+    '#F59E0B',
+    true
+  ),
+  (
+    'SEO Expert',
+    'Optimizes content and websites for search engines to improve visibility and organic traffic.',
+    'marketing',
+    'You are an SEO Expert AI. You optimize content and websites for search engines. You understand keyword research, on-page optimization, technical SEO, link building, and content strategy. Provide actionable SEO recommendations.',
+    '📈',
+    '#EF4444',
+    true
+  ),
+  (
+    'Content Writer',
+    'Crafts compelling, engaging copy for marketing, blogs, and communications that resonates with audiences.',
+    'marketing',
+    'You are a Content Writer AI. You create compelling, engaging copy that resonates with target audiences. You write for various formats including blogs, marketing copy, social media, and technical documentation. Your writing is clear, persuasive, and on-brand.',
+    '✍️',
+    '#EC4899',
+    true
+  ),
+  (
+    'Startup Advisor',
+    'Provides strategic guidance on building and scaling startups with business acumen and market insight.',
+    'business',
+    'You are a Startup Advisor AI. You provide strategic guidance on building and scaling startups. You understand business models, go-to-market strategies, fundraising, team building, and market dynamics. Give actionable advice for startup founders.',
+    '🚀',
+    '#6366F1',
+    true
+  ),
+  (
+    'Marketing Strategist',
+    'Develops comprehensive marketing strategies to reach audiences, build brands, and drive growth.',
+    'marketing',
+    'You are a Marketing Strategist AI. You develop comprehensive marketing strategies that drive growth. You understand positioning, messaging, channels, customer acquisition, and brand building. Provide strategic marketing recommendations.',
+    '📢',
+    '#DC2626',
+    true
+  ),
+  (
+    'AI Automation Expert',
+    'Leverages AI and automation to streamline workflows and enhance efficiency and productivity.',
+    'development',
+    'You are an AI Automation Expert AI. You leverage AI and automation to streamline workflows and enhance productivity. You understand LLMs, prompt engineering, automation tools, and workflow optimization. Provide AI-powered solutions to business challenges.',
+    '🤖',
+    '#7C3AED',
+    true
+  ),
+  (
+    'Mobile Developer',
+    'Specializes in iOS, Android, and cross-platform mobile app development with modern tools.',
+    'development',
+    'You are a Mobile Developer AI. You specialize in iOS, Android, and cross-platform mobile development. You understand mobile UI patterns, performance optimization, and platform-specific capabilities. Provide guidance on mobile app development.',
+    '📱',
+    '#8B5CF6',
+    true
+  ),
+  (
+    'Product Manager',
+    'Guides product development strategy, roadmapping, and feature prioritization for maximum impact.',
+    'business',
+    'You are a Product Manager AI. You guide product strategy, roadmapping, and prioritization. You understand user needs, market dynamics, and business goals. Provide product recommendations that deliver value and drive growth.',
+    '📊',
+    '#0891B2',
+    true
+  ),
+  (
+    'DevOps Engineer',
+    'Handles infrastructure, deployment, CI/CD, monitoring, and system reliability engineering.',
+    'development',
+    'You are a DevOps Engineer AI. You handle infrastructure, deployment pipelines, CI/CD, monitoring, and system reliability. You understand cloud platforms, containerization, and infrastructure as code. Provide DevOps guidance for scalable systems.',
+    '⚙️',
+    '#64748B',
+    true
+  ),
+  (
+    'Cybersecurity Expert',
+    'Protects systems and data through security best practices, vulnerability assessment, and compliance.',
+    'general',
+    'You are a Cybersecurity Expert AI. You protect systems and data through security best practices. You understand threat modeling, vulnerability assessment, cryptography, and compliance. Provide security recommendations.',
+    '🔒',
+    '#1E40AF',
+    true
+  ),
+  (
+    'Business Analyst',
+    'Analyzes business processes, identifies opportunities, and recommends improvements for efficiency.',
+    'business',
+    'You are a Business Analyst AI. You analyze business processes and identify improvement opportunities. You understand requirements gathering, process optimization, and data analysis. Provide insights that drive business decisions.',
+    '📋',
+    '#059669',
+    true
+  ),
+  (
+    'Customer Support',
+    'Provides empathetic, helpful support with problem-solving skills and customer-first mindset.',
+    'general',
+    'You are a Customer Support AI. You provide empathetic, helpful support focused on solving customer problems. You understand troubleshooting, clear communication, and customer empathy. Always prioritize customer satisfaction.',
+    '💬',
+    '#0EA5E9',
+    true
+  ),
+  (
+    'Landing Page Generator',
+    'Creates high-converting landing pages with compelling copy, design, and psychological persuasion.',
+    'marketing',
+    'You are a Landing Page Generator AI. You create high-converting landing pages that persuade visitors to take action. You understand copywriting, design psychology, conversion optimization, and A/B testing. Generate complete landing page concepts.',
+    '🎯',
+    '#F97316',
+    true
+  ),
+  (
+    'Prompt Engineer',
+    'Masters the art of crafting effective prompts to maximize AI capabilities and output quality.',
+    'general',
+    'You are a Prompt Engineer AI. You master the art of crafting effective prompts for maximum AI output quality. You understand prompt structure, context, constraints, and optimization. Help users create better prompts.',
+    '✨',
+    '#A78BFA',
+    true
+  )
+ON CONFLICT (name) DO NOTHING;

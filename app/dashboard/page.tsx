@@ -1,40 +1,103 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Globe,
+  Smartphone,
+  Package,
+  Palette,
+  Code2,
+  Zap,
+  Bot,
+  MessageCircle,
+  Plus,
+  FolderPlus,
+} from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { LogOut, MessageSquare, BookOpen, Zap, TrendingUp } from 'lucide-react'
 
-interface UserStats {
-  conversationsCount: number
-  messagesCount: number
-  resourcesViewed: number
-  forumPostsCreated: number
-  creditsRemaining: number
-  totalTokensUsed: number
+interface Project {
+  id: string
+  name: string
+  description: string
+  created_at: string
+  status: string
 }
 
+const builders = [
+  {
+    title: 'Website Builder',
+    description: 'Create stunning websites with AI',
+    icon: Globe,
+    href: '/dashboard/builders/website',
+    color: 'from-blue-500 to-blue-600',
+  },
+  {
+    title: 'App Builder',
+    description: 'Build mobile & web apps',
+    icon: Smartphone,
+    href: '/dashboard/builders/app',
+    color: 'from-purple-500 to-purple-600',
+  },
+  {
+    title: 'SaaS Builder',
+    description: 'Launch your SaaS product',
+    icon: Package,
+    href: '/dashboard/builders/saas',
+    color: 'from-pink-500 to-pink-600',
+  },
+  {
+    title: 'UI Components',
+    description: 'Design UI components',
+    icon: Palette,
+    href: '/dashboard/builders/ui',
+    color: 'from-orange-500 to-orange-600',
+  },
+  {
+    title: 'Code Snippets',
+    description: 'Generate code',
+    icon: Code2,
+    href: '/dashboard/builders/coding',
+    color: 'from-green-500 to-green-600',
+  },
+  {
+    title: 'SEO Optimizer',
+    description: 'Optimize for search',
+    icon: Zap,
+    href: '/dashboard/builders/seo',
+    color: 'from-yellow-500 to-yellow-600',
+  },
+  {
+    title: 'AI Agent',
+    description: 'Create autonomous agents',
+    icon: Bot,
+    href: '/dashboard/builders/agent',
+    color: 'from-indigo-500 to-indigo-600',
+  },
+  {
+    title: 'Chatbot',
+    description: 'Build chatbots',
+    icon: MessageCircle,
+    href: '/dashboard/builders/chatbot',
+    color: 'from-cyan-500 to-cyan-600',
+  },
+]
+
 export default function DashboardPage() {
-  const router = useRouter()
-  const [user, setUser] = useState<any>(null)
-  const [userProfile, setUserProfile] = useState<any>(null)
-  const [stats, setStats] = useState<UserStats>({
-    conversationsCount: 0,
-    messagesCount: 0,
-    resourcesViewed: 0,
-    forumPostsCreated: 0,
-    creditsRemaining: 0,
-    totalTokensUsed: 0,
-  })
+  const [projects, setProjects] = useState<Project[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [user, setUser] = useState<any>(null)
+  const router = useRouter()
 
   useEffect(() => {
-    const loadUser = async () => {
-      setIsLoading(true)
+    const loadData = async () => {
       try {
         const supabase = createClient()
+        
+        // Check auth
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
           router.push('/auth/login')
@@ -42,165 +105,116 @@ export default function DashboardPage() {
         }
         setUser(user)
 
-        const { data: profile } = await supabase
-          .from('users')
+        // Load projects
+        const { data: projectsData } = await supabase
+          .from('projects')
           .select('*')
-          .eq('id', user.id)
-          .single()
-
-        setUserProfile(profile)
-
-        const { data: conversations } = await supabase
-          .from('ai_conversations')
-          .select('id', { count: 'exact' })
           .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(6)
 
-        const { data: posts } = await supabase
-          .from('forum_posts')
-          .select('id', { count: 'exact' })
-          .eq('user_id', user.id)
-
-        const { data: usageData } = await supabase
-          .from('usage_tracking')
-          .select('tokens_used')
-          .eq('user_id', user.id)
-
-        const totalTokens = usageData?.reduce((sum: number, row: any) => sum + (row.tokens_used || 0), 0) || 0
-
-        setStats({
-          conversationsCount: conversations?.length || 0,
-          messagesCount: 0,
-          resourcesViewed: 0,
-          forumPostsCreated: posts?.length || 0,
-          creditsRemaining: profile?.credits_remaining || 0,
-          totalTokensUsed: totalTokens,
-        })
+        setProjects(projectsData || [])
       } catch (error) {
-        console.error('Error loading user:', error)
+        console.error('Error loading data:', error)
       } finally {
         setIsLoading(false)
       }
     }
 
-    loadUser()
+    loadData()
   }, [router])
-
-  const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/')
-  }
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex items-center justify-center min-h-screen">
         <p className="text-foreground/60">Loading...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <nav className="sticky top-0 z-50 bg-card/80 backdrop-blur-sm border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/chat" className="text-2xl font-bold text-primary">
-              ARIX
-            </Link>
-            <Button
-              onClick={handleLogout}
-              variant="outline"
-              className="border-border hover:bg-card text-foreground flex items-center gap-2"
-            >
-              <LogOut className="w-4 h-4" />
-              Logout
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Welcome back!</h1>
+          <p className="text-foreground/60 mt-2">Create amazing projects with Arix AI builders</p>
+        </div>
+        <Button className="gap-2" size="lg">
+          <FolderPlus className="w-5 h-5" />
+          New Project
+        </Button>
+      </div>
+
+      {/* AI Builders Grid */}
+      <div>
+        <h2 className="text-2xl font-bold text-foreground mb-4">AI Builders</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {builders.map((builder) => {
+            const Icon = builder.icon
+            return (
+              <Link key={builder.href} href={builder.href}>
+                <Card className="h-full cursor-pointer hover:shadow-lg transition-shadow bg-card border-border">
+                  <CardHeader className="pb-3">
+                    <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${builder.color} flex items-center justify-center mb-2`}>
+                      <Icon className="w-6 h-6 text-white" />
+                    </div>
+                    <CardTitle className="text-lg">{builder.title}</CardTitle>
+                    <CardDescription>{builder.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button className="w-full" variant="outline" size="sm">
+                      Launch
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Link>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Recent Projects */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold text-foreground">Recent Projects</h2>
+          <Link href="/dashboard/projects">
+            <Button variant="outline" size="sm">
+              View All
             </Button>
-          </div>
+          </Link>
         </div>
-      </nav>
-
-      <section className="py-12 border-b border-border/30 bg-card/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-4xl font-bold mb-2">Dashboard</h1>
-          <p className="text-foreground/60">Welcome back, {user?.email}</p>
-
-          <div className="bg-background border border-border rounded-lg p-6 mt-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <p className="text-foreground/60 text-sm font-medium mb-2">Plan</p>
-                <p className="text-lg font-semibold uppercase">{userProfile?.subscription_tier || 'Free'}</p>
-              </div>
-              <div>
-                <p className="text-foreground/60 text-sm font-medium mb-2">Credits Remaining</p>
-                <p className="text-lg font-semibold text-primary">{stats.creditsRemaining}</p>
-              </div>
-              <div>
-                <p className="text-foreground/60 text-sm font-medium mb-2">Member Since</p>
-                <p className="text-lg font-semibold">{new Date(user?.created_at).toLocaleDateString()}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-2xl font-bold mb-8">Activity</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-            <div className="bg-card border border-border rounded-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-foreground/80">Conversations</h3>
-                <MessageSquare className="w-5 h-5 text-primary" />
-              </div>
-              <p className="text-3xl font-bold">{stats.conversationsCount}</p>
-              <p className="text-sm text-foreground/60">Total chats</p>
-            </div>
-
-            <div className="bg-card border border-border rounded-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-foreground/80">Forum Posts</h3>
-                <BookOpen className="w-5 h-5 text-primary" />
-              </div>
-              <p className="text-3xl font-bold">{stats.forumPostsCreated}</p>
-              <p className="text-sm text-foreground/60">Posts created</p>
-            </div>
-
-            <div className="bg-card border border-border rounded-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-foreground/80">Tokens Used</h3>
-                <Zap className="w-5 h-5 text-primary" />
-              </div>
-              <p className="text-3xl font-bold">{stats.totalTokensUsed}</p>
-              <p className="text-sm text-foreground/60">Total tokens</p>
-            </div>
-
-            <div className="bg-card border border-border rounded-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-foreground/80">Streak</h3>
-                <TrendingUp className="w-5 h-5 text-primary" />
-              </div>
-              <p className="text-3xl font-bold">3</p>
-              <p className="text-sm text-foreground/60">Days active</p>
-            </div>
-          </div>
-
-          <div className="bg-card/20 border border-border rounded-lg p-8">
-            <h3 className="text-xl font-bold mb-6">Quick Links</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Link href="/chat">
-                <Button className="w-full bg-primary hover:bg-primary/90">Start Chat</Button>
+        
+        {projects.length === 0 ? (
+          <Card className="bg-card border-border">
+            <CardContent className="pt-12 text-center">
+              <p className="text-foreground/60 mb-4">No projects yet. Create your first one!</p>
+              <Button className="gap-2">
+                <FolderPlus className="w-4 h-4" />
+                Create Project
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {projects.map((project) => (
+              <Link key={project.id} href={`/dashboard/projects/${project.id}`}>
+                <Card className="h-full cursor-pointer hover:shadow-lg transition-shadow bg-card border-border">
+                  <CardHeader>
+                    <CardTitle className="line-clamp-1">{project.name}</CardTitle>
+                    <CardDescription className="line-clamp-2">{project.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-foreground/50">
+                      {new Date(project.created_at).toLocaleDateString()}
+                    </p>
+                  </CardContent>
+                </Card>
               </Link>
-              <Link href="/resources">
-                <Button variant="outline" className="w-full border-border hover:bg-card">Resources</Button>
-              </Link>
-              <Link href="/forum">
-                <Button variant="outline" className="w-full border-border hover:bg-card">Forums</Button>
-              </Link>
-            </div>
+            ))}
           </div>
-        </div>
-      </section>
+        )}
+      </div>
     </div>
   )
 }
