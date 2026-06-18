@@ -18,6 +18,7 @@ import {
   Workflow,
   MessageCircle,
   Bot,
+  Plug,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
@@ -39,6 +40,7 @@ const navigationItems = [
   { label: 'Chatbot Builder', href: '/dashboard/builders/chatbot', icon: MessageCircle },
   { divider: true },
   { label: 'Workflows', href: '/dashboard/workflows', icon: Workflow },
+  { label: 'Integrations', href: '/dashboard/integrations', icon: Plug },
   { divider: true },
   { label: 'Team', href: '/dashboard/team', icon: Users },
   { label: 'Settings', href: '/dashboard/settings', icon: Settings },
