@@ -107,7 +107,7 @@ export default function ChatPanel({ chatId, projectId, compact = false }) {
       </div>
 
       {/* Input */}
-      <form onSubmit={send} className="border-t border-white/5 p-3 bg-[#0a0a0a]">
+      <form onSubmit={send} className="border-t border-white/5 p-3 pr-32 bg-[#0a0a0a]">
         <div className="border border-white/10 focus-within:border-amber-500 transition flex items-end gap-2 p-2">
           <textarea data-testid="chat-input"
             value={input} onChange={(e) => setInput(e.target.value)}
@@ -115,7 +115,7 @@ export default function ChatPanel({ chatId, projectId, compact = false }) {
             placeholder="Ask Arix… (Shift+Enter for newline)"
             rows={1}
             className="flex-1 bg-transparent resize-none font-body text-sm placeholder-zinc-600 focus:outline-none px-2 py-1.5 max-h-32" />
-          <button type="submit" disabled={busy || !input.trim()} data-testid="chat-send-button"
+          <button type="submit" disabled={busy || !input.trim()} data-testid="chat-send-button" aria-label="Send message"
             className="bg-amber-500 text-black p-2 hover:bg-amber-400 transition disabled:opacity-40 disabled:cursor-not-allowed">
             <PaperPlaneRight weight="fill" size={16} />
           </button>

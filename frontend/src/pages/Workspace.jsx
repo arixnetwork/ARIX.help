@@ -114,6 +114,7 @@ export default function Workspace() {
   };
 
   const runPreview = () => {
+    setBottomTab("preview");
     setPreviewKey((k) => k + 1);
     setTerminalLog((l) => [...l, "> reloading preview…", "> preview ready ✓"]);
     toast.success("Preview reloaded");
@@ -172,6 +173,14 @@ export default function Workspace() {
         <button onClick={runPreview} data-testid="workspace-preview-button" className="font-mono text-[10px] tracking-mono uppercase border border-white/10 px-3 py-1.5 hover:border-amber-500 hover:text-amber-400 transition flex items-center gap-2">
           <Play weight="bold" size={12} /> Preview
         </button>
+        <div className="hidden md:flex items-center gap-1 border border-white/10 px-1 py-0.5" data-testid="device-toggle-group">
+          {[["desktop", Desktop],["tablet", DeviceTablet],["mobile", DeviceMobile]].map(([d, Icon]) => (
+            <button key={d} onClick={()=>{ setDevice(d); setBottomTab("preview"); }} data-testid={`device-${d}`} title={`${d} preview`}
+              className={`p-1.5 transition ${device === d ? "text-amber-400" : "text-zinc-500 hover:text-zinc-200"}`}>
+              <Icon weight="bold" size={12} />
+            </button>
+          ))}
+        </div>
         <button onClick={() => setShowUpload(true)} data-testid="workspace-upload-button" className="font-mono text-[10px] tracking-mono uppercase border border-white/10 px-3 py-1.5 hover:border-amber-500 hover:text-amber-400 transition flex items-center gap-2">
           <UploadSimple weight="bold" size={12} /> Upload
         </button>

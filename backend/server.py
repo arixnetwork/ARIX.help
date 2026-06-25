@@ -27,6 +27,12 @@ from datetime import datetime, timezone, timedelta
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 
+# Sub-routers (install wizard, integrations, diagnostics, backups)
+from install import router as install_router
+from integrations import router as integrations_router
+from diagnostics import router as diagnostics_router
+from backups import router as backups_router
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
@@ -627,6 +633,10 @@ async def admin_stats(user: User = Depends(get_current_user)):
     return {"users": users, "projects": projects, "chats": chats, "deployments": deps}
 
 app.include_router(api)
+app.include_router(install_router)
+app.include_router(integrations_router)
+app.include_router(diagnostics_router)
+app.include_router(backups_router)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,

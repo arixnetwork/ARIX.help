@@ -69,7 +69,7 @@ export default function DashboardLayout() {
               <div className="text-sm truncate">{user?.name}</div>
               <div className="font-mono text-[10px] tracking-mono uppercase text-zinc-500 truncate">{user?.role}</div>
             </div>
-            <button onClick={handleLogout} data-testid="sidebar-logout-button"
+            <button onClick={handleLogout} data-testid="logout-button" aria-label="Sign out"
               className="text-zinc-400 hover:text-amber-400 transition p-2" title="Sign out">
               <SignOut weight="bold" size={16} />
             </button>
