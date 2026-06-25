@@ -3,7 +3,6 @@ import { verifyWebhookSignature } from '@/lib/stripe'
 import {
   updateSubscriptionStatus,
   createStripeInvoice,
-  updateUserSubscription,
 } from '@/lib/db/queries'
 import { createClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
@@ -71,11 +70,6 @@ export async function POST(request: NextRequest) {
 
           // Update subscription in database
           await updateSubscriptionStatus(subscription.id, status, currentPeriodEnd)
-
-          // Update user's subscription tier if active
-          if (status === 'active') {
-            await updateUserSubscription(customer.user_id, 'pro')
-          }
         }
         break
       }
@@ -92,9 +86,6 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (customer) {
-          // Revert to free tier
-          await updateUserSubscription(customer.user_id, 'free')
-
           // Update subscription status
           await updateSubscriptionStatus(subscription.id, 'canceled')
         }
