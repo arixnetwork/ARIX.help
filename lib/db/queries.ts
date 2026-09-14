@@ -98,6 +98,29 @@ export async function updateConversationTitle(
   }
 }
 
+export async function updateUserSubscription(userId: string, subscriptionTier: string) {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('users')
+      .update({ subscription_tier: subscriptionTier })
+      .eq('id', userId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[v0] Failed to update user subscription:', error)
+      return null
+    }
+
+    return data
+  } catch (error) {
+    console.error('[v0] Error updating user subscription:', error)
+    return null
+  }
+}
+
 export async function getUserProfile(userId: string) {
   try {
     const supabase = await createClient()
